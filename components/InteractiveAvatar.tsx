@@ -1,4 +1,4 @@
-import type { StartAvatarResponse } from "@heygen/streaming-avatar";
+import type { SpeakRequest, StartAvatarRequest, StartAvatarResponse } from "@heygen/streaming-avatar";
 
 import StreamingAvatar, {
   AvatarQuality,
@@ -24,6 +24,7 @@ import { useMemoizedFn, usePrevious } from "ahooks";
 import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
 import {AVATARS, STT_LANGUAGE_LIST} from "@/app/lib/constants";
+import { convertFloat32ToS16PCM, sleep } from "@/app/lib/utils";
 
 export default function InteractiveAvatar() {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -32,7 +33,7 @@ export default function InteractiveAvatar() {
   const [debug, setDebug] = useState<string>();
   const [knowledgeId, setKnowledgeId] = useState<string>("");
   const [avatarId, setAvatarId] = useState<string>("");
-  const [language, setLanguage] = useState<string>('en');
+  const [language, setLanguage] = useState<string>('it');
 
   const [data, setData] = useState<StartAvatarResponse>();
   const [text, setText] = useState<string>("");
@@ -88,6 +89,209 @@ export default function InteractiveAvatar() {
       setIsUserTalking(false);
     });
     try {
+        let session: StartAvatarResponse 
+        avatar.current.newSession = async function newSession(requestData: StartAvatarRequest): Promise<StartAvatarResponse> {
+            console.log("New session")
+            //@ts-ignore
+            const response = await fetch("/api/streaming.new", {
+                method: "POST",
+                body: JSON.stringify(requestData)
+              });
+
+            session = (await response.json()).data
+            console.log(session)
+
+            avatar.current!.startSession = async function newSession(): Promise<any> {
+                //@ts-ignore
+                console.log("Start session", (session.session_id))
+                //@ts-ignore
+                return await fetch("/api/streaming.start", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        //@ts-ignore
+                        sessionId: session.session_id
+                    })
+                  });
+            }
+
+            avatar.current!.stopAvatar = async function newSession(): Promise<any> {
+                this.closeVoiceChat()
+                //@ts-ignore
+                console.log("STOP", session.session_id)
+                //@ts-ignore
+                return await fetch("/api/streaming.stop", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        //@ts-ignore
+                        sessionId: session.session_id
+                    })
+                });
+            }
+
+            avatar.current!.speak = async function speak(requestData: SpeakRequest): Promise<any> {
+                requestData.taskType = requestData.taskType || requestData.task_type || TaskType.TALK;
+                requestData.taskMode = requestData.taskMode || TaskMode.ASYNC;
+            
+                // try to use websocket first
+                // only support talk task
+                if (
+                    // @ts-ignore
+                  this.webSocket && this.audioRawFrame &&
+                  requestData.task_type === TaskType.TALK &&
+                  requestData.taskMode !== TaskMode.SYNC
+                ) {
+                    // @ts-ignore
+                  const frame = this.audioRawFrame?.create({
+                    text: {
+                      text: requestData.text,
+                    },
+                  });
+                    // @ts-ignore
+                  const encodedFrame = new Uint8Array(this.audioRawFrame?.encode(frame).finish());
+                    // @ts-ignore
+                  this.webSocket?.send(encodedFrame);
+                  return;
+                }
+                // @ts-ignore
+                return fetch('/api/streaming.task', {
+                    method: "POST",
+                    body: JSON.stringify({
+                        text: requestData.text,
+                        // @ts-ignore
+                    session_id: this.sessionId,
+                    task_mode: requestData.taskMode,
+                    task_type: requestData.taskType,
+                  })
+                });
+            }
+
+            avatar.current!.startListening = async function startListening(): Promise<any> {
+                return await fetch("/api/streaming.start_listening", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        //@ts-ignore
+                        session_id: session.session_id
+                    })
+                  });
+            }
+
+            avatar.current!.stopListening = async function stopListening(): Promise<any> {
+                return await fetch("/api/streaming.stop_listening", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        //@ts-ignore
+                        session_id: session.session_id
+                    })
+                  });
+            }
+
+            avatar.current!.interrupt = async function interrupt(): Promise<any> {
+                return await fetch("/api/streaming.interrupt", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        //@ts-ignore
+                        session_id: session.session_id
+                    })
+                  });
+            }
+
+            const oldStartVoiceChatImplementation = avatar.current!.startVoiceChat;
+            avatar.current!.startVoiceChat = async function (requestData?: {
+                useSilencePrompt?: boolean;
+                isInputAudioMuted?: boolean;
+            }): Promise<void> {
+                // await oldStartVoiceChatImplementation.call(this, requestData)
+                //@ts-ignore
+                requestData.useSilencePrompt = requestData.useSilencePrompt || false;
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    return;
+                }
+
+                try {
+                //@ts-ignore
+                    await this.loadAudioRawFrame();
+                //@ts-ignore
+                    const didOpen = await this.connectWebSocket({ useSilencePrompt: requestData.useSilencePrompt });    
+                
+                    console.log("didOpen", didOpen)
+                    if (!didOpen) {
+                        throw 'couldnt open socket'
+                    }
+
+                //@ts-ignore
+                    this.audioContext = new window.AudioContext({
+                        latencyHint: 'interactive',
+                        sampleRate: 16000,
+                    });
+                    const devicesStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        autoGainControl: true,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        },
+                    });
+                //@ts-ignore
+                    this.mediaDevicesStream = devicesStream;
+
+                //@ts-ignore
+                    this.mediaStreamAudioSource =
+                //@ts-ignore
+                        this.audioContext?.createMediaStreamSource(devicesStream);
+                //@ts-ignore
+                    this.scriptProcessor = this.audioContext?.createScriptProcessor(512, 1, 1);
+
+                //@ts-ignore
+                    this.mediaStreamAudioSource.connect(this.scriptProcessor);
+                //@ts-ignore
+                    this.scriptProcessor.connect(this.audioContext?.destination);
+
+                //@ts-ignore
+                    if (!requestData.isInputAudioMuted) {
+                //@ts-ignore
+                        this.isMuted = false;
+                    }
+
+                //@ts-ignore
+                    this.scriptProcessor.onaudioprocess = (event) => {
+                //@ts-ignore
+                        if (!this.webSocket) {
+                            return;
+                        }
+                        let audioData: Float32Array;
+                        if (this.isInputAudioMuted) {
+                            audioData = new Float32Array(512);
+                        } else {
+                            audioData = event.inputBuffer.getChannelData(0);
+                        }
+                        const pcmS16Array = convertFloat32ToS16PCM(audioData);
+                        const pcmByteArray = new Uint8Array(pcmS16Array.buffer);
+                //@ts-ignore
+                        const frame = this.audioRawFrame?.create({
+                        audio: {
+                            audio: Array.from(pcmByteArray),
+                            sampleRate: 16000,
+                            numChannels: 1,
+                        },
+                        });
+                //@ts-ignore
+                        const encodedFrame = new Uint8Array(this.audioRawFrame?.encode(frame).finish());
+                //@ts-ignore
+                        this.webSocket?.send(encodedFrame);
+                    };
+
+                    // though room has been connected, but the stream may not be ready.
+                    await sleep(2000);
+                } catch (e) {
+                console.error(e);
+                throw e;
+                }
+            }
+
+            return session;
+        }
+
       const res = await avatar.current.createStartAvatar({
         quality: AvatarQuality.Low,
         avatarName: avatarId,
@@ -107,6 +311,7 @@ export default function InteractiveAvatar() {
       });
 
       setData(res);
+      console.log(avatar.current)
       // default to voice mode
       await avatar.current?.startVoiceChat({
         useSilencePrompt: false
@@ -114,6 +319,7 @@ export default function InteractiveAvatar() {
       setChatMode("voice_mode");
     } catch (error) {
       console.error("Error starting avatar session:", error);
+      endSession()
     } finally {
       setIsLoadingSession(false);
     }
@@ -155,7 +361,9 @@ export default function InteractiveAvatar() {
     if (v === "text_mode") {
       avatar.current?.closeVoiceChat();
     } else {
-      await avatar.current?.startVoiceChat();
+      await avatar.current?.startVoiceChat({
+        useSilencePrompt: false
+      });
     }
     setChatMode(v);
   });
