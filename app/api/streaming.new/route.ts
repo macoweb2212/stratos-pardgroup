@@ -8,11 +8,15 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
+    const bearerHeader = req.headers.get("Authorization");
+    if (bearerHeader == null) throw new Error('not authorized')
+        
     const response = await fetch(
         "https://api.heygen.com/v1/streaming.new",
         {
           method: "POST",
           headers: {
+            Authorization: bearerHeader,
             "x-api-key": HEYGEN_API_KEY!,
             "Content-Type": "application/json",
           },
