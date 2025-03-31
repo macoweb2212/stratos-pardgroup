@@ -418,15 +418,36 @@ export default function InteractiveAvatar() {
                     </SelectItem>
                   ))}
                 </Select> */}
+                <div className="text-center font-semibold text-lg"> 
+                    Scopri il consulente virtuale Plenitude: informazioni complete sui nostri prodotti e servizi, con la possibilità effettuare roleplay di vendita e altre simulazioni interattive.
+                </div>
               </div>
-              <Button
-                className="bg-gradient-to-tr from-indigo-500 to-indigo-300 w-full text-white"
-                size="md"
-                variant="shadow"
-                onClick={startSession}
-              >
-                Start session
-              </Button>
+              <div className="flex w-full gap-5">
+                <Button
+                    className="flex-1 bg-gradient-to-tr from-indigo-500 to-indigo-300 w-full text-white h-14"
+                    size="md"
+                    variant="shadow"
+                    onClick={startSession}
+                >
+                    Start session
+                </Button>
+                <Select
+                  label="Select language"
+                  placeholder="Select language"
+                  className="h-10 w-32"
+                  selectedKeys={[language]}
+                  onChange={(e) => {
+                    setLanguage(e.target.value);
+                  }}
+                >
+                  {STT_LANGUAGE_LIST.map((lang) => (
+                    <SelectItem key={lang.key}>
+                      {lang.label}
+                    </SelectItem>
+                  ))}
+                </Select>
+
+              </div>
             </div>
           ) : (
             <Spinner color="default" size="lg" />
