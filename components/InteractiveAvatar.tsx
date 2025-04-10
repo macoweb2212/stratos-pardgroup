@@ -245,7 +245,7 @@ export default function InteractiveAvatar() {
           // },
         },
         language: language,
-        disableIdleTimeout: true,
+        // disableIdleTimeout: false,
       });
 
       setData(res);
