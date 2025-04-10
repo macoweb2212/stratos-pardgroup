@@ -17,9 +17,8 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: {
             Authorization: bearerHeader,
-            "x-api-key": HEYGEN_API_KEY!,
             "Content-Type": "application/json",
-          },
+          },    
           body: JSON.stringify({
             avatar_name: body.avatarName,
             quality: body.quality,
