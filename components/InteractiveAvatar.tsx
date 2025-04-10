@@ -233,7 +233,7 @@ export default function InteractiveAvatar() {
         const res = await avatar.current.createStartAvatar({
         quality: AvatarQuality.High,
         avatarName: avatarId,
-        knowledgeId: knowledgeId, // Or use a custom `knowledgeBase`.
+        knowledgeId: '8c0e0d1c9e3b43ebbcfaf2311852d8c4', // Or use a custom `knowledgeBase`.
         voice: {
           rate: 1.5, // 0.5 ~ 1.5
           emotion: VoiceEmotion.EXCITED,
