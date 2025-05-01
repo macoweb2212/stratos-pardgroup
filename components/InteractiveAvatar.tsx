@@ -42,6 +42,22 @@ export default function InteractiveAvatar() {
   const [chatMode, setChatMode] = useState("text_mode");
   const [isUserTalking, setIsUserTalking] = useState(false);
 
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.lang = 'it-IT';
+    recognitionRef.current.interimResults = false;
+
+    recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('User said:', transcript);
+      };
+  }, []);
+
   async function fetchAccessToken() {
     try {
       const response = await fetch("/api/get-access-token", {
@@ -60,6 +76,10 @@ export default function InteractiveAvatar() {
   }
 
   async function startSession() {
+
+    recognitionRef.current?.start()
+    console.log("Recognition speech started")
+    return;
     setIsLoadingSession(true);
     const newToken = await fetchAccessToken();
 
@@ -251,10 +271,10 @@ export default function InteractiveAvatar() {
       setData(res);
       console.log(avatar.current)
       // default to voice mode
-      await avatar.current?.startVoiceChat({
-        useSilencePrompt: false
-      });
-      setChatMode("voice_mode");
+    //   await avatar.current?.startVoiceChat({
+    //     useSilencePrompt: false
+    //   });
+    //   setChatMode("voice_mode");
     } catch (error) {
       console.error("Error starting avatar session:", error);
       endSession()
@@ -427,7 +447,7 @@ export default function InteractiveAvatar() {
                     className="flex-1 bg-gradient-to-tr from-indigo-500 to-indigo-300 w-full text-white h-14"
                     size="md"
                     variant="shadow"
-                    onClick={startSession}
+                    onPress={startSession}
                 >
                     Start session
                 </Button>
