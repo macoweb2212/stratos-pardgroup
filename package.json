@@ -28,6 +28,7 @@
     "@phosphor-icons/react": "^2.1.5",
     "@react-aria/ssr": "3.9.4",
     "@react-aria/visually-hidden": "3.8.12",
+    "@types/dom-speech-recognition": "^0.0.6",
     "@uiw/codemirror-extensions-langs": "^4.22.1",
     "@uiw/react-codemirror": "^4.22.1",
     "ahooks": "^3.8.1",
