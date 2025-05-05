@@ -32,6 +32,7 @@ import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
 import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { convertFloat32ToS16PCM, sleep } from "@/app/lib/utils";
+import { fetchAccessToken } from "@/app/lib/apiClient";
 
 export default function InteractiveAvatar() {
     const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -64,23 +65,6 @@ export default function InteractiveAvatar() {
             console.log("User said:", transcript);
         };
     }, []);
-
-    async function fetchAccessToken() {
-        try {
-            const response = await fetch("/api/get-access-token", {
-                method: "POST",
-            });
-            const token = await response.text();
-
-            console.log("Access Token:", token); // Log the token to verify
-
-            return token;
-        } catch (error) {
-            console.error("Error fetching access token:", error);
-        }
-
-        return "";
-    }
 
     async function startSession() {
         recognitionRef.current?.start();

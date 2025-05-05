@@ -1,4 +1,4 @@
-async function fetchAccessToken() {
+export async function fetchAccessToken() {
     try {
         const response = await fetch("/api/get-access-token", {
             method: "POST",
