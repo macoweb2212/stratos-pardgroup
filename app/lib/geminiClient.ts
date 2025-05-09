@@ -27,6 +27,6 @@ export function createGemini2_0FlashLite(customGoogleAiClient: GoogleGenAI = ai)
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { provaTrainerPrompt } from "./ai/prompt";
 
-const google = createGoogleGenerativeAI({
+export const google = createGoogleGenerativeAI({
     apiKey: "AIzaSyCNH-0agsIcfcYluvDvafVNLKitvtR1-cY",
 });
