@@ -16,17 +16,16 @@ import {
     Card,
     CardBody,
     CardFooter,
+    Chip,
     Divider,
-    Input,
     Select,
     SelectItem,
     Spinner,
-    Chip,
-    Tabs,
     Tab,
+    Tabs,
 } from "@nextui-org/react";
-import { useEffect, useRef, useState } from "react";
 import { useMemoizedFn, usePrevious } from "ahooks";
+import { useEffect, useRef, useState } from "react";
 
 import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
@@ -52,6 +51,8 @@ export default function InteractiveAvatar() {
     const avatar = useRef<StreamingAvatar | null>(null);
     const [chatMode, setChatMode] = useState("text_mode");
     const [isUserTalking, setIsUserTalking] = useState(false);
+    const [geminiClient, setGeminiClient] = useState(createGemini2_0FlashLite());
+    const [chatHistory, setChatHistory] = useState<CoreMessage[]>([]);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -63,206 +64,65 @@ export default function InteractiveAvatar() {
         recognitionRef.current.lang = "it-IT";
         recognitionRef.current.interimResults = false;
 
-        recognitionRef.current.onresult = (event) => {
+        recognitionRef.current.onresult = async (event) => {
             const transcript = event.results[0][0].transcript;
             console.log("User said:", transcript);
+
+            const updatedHistory: CoreMessage[] = [
+                ...chatHistory,
+                {
+                    role: "user",
+                    content: transcript,
+                },
+            ];
+            setChatHistory(updatedHistory);
+            const reader = await streamResponse(updatedHistory);
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                console.log(chunk); // logs incremental text
+            }
+            // console.log("Gemini's response", response.text);
+            // console.log("Recognition response", response);
+            // avatar.current?.speak({
+            //     task_type: TaskType.REPEAT,
+            //     text: response.text ?? "no text, just respond with error",
+            // });
         };
+
+        recognitionRef.current.onerror = (error) => {
+            console.log("There was an error on speech recognition", error);
+        };
+
+        recognitionRef.current.addEventListener("soundstart", (event) => {
+            console.log("sound start");
+        });
     }, []);
 
     async function startSession() {
-        recognitionRef.current?.start();
-        console.log("Recognition speech started");
-        return;
         setIsLoadingSession(true);
         const newToken = await fetchAccessToken();
 
         avatar.current = new StreamingAvatar({
             token: newToken,
         });
-        avatar.current.on(StreamingEvents.AVATAR_START_TALKING, (e) => {
-            console.log("Avatar started talking", e);
-        });
-        avatar.current.on(StreamingEvents.AVATAR_STOP_TALKING, (e) => {
-            console.log("Avatar stopped talking", e);
-        });
-        avatar.current.on(StreamingEvents.STREAM_DISCONNECTED, () => {
-            console.log("Stream disconnected");
-            endSession();
-        });
-        avatar.current?.on(StreamingEvents.STREAM_READY, (event) => {
-            console.log(">>>>> Stream ready:", event.detail);
-            setStream(event.detail);
-        });
-        avatar.current?.on(StreamingEvents.USER_START, (event) => {
-            console.log(">>>>> User started talking:", event);
-            setIsUserTalking(true);
-        });
-        avatar.current?.on(StreamingEvents.USER_STOP, (event) => {
-            console.log(">>>>> User stopped talking:", event);
-            setIsUserTalking(false);
-        });
+
         try {
-            let session: StartAvatarResponse;
-
-            // ========================== Overrides =============================
-            avatar.current.newSession = async function newSession(
-                requestData: StartAvatarRequest
-            ): Promise<StartAvatarResponse> {
-                console.log("New session");
-                //@ts-ignore
-                const response = await fetch("/api/streaming.new", {
-                    method: "POST",
-                    body: JSON.stringify(requestData),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-
-                session = (await response.json()).data;
-                console.log(session);
-
-                return session;
-            };
-
-            avatar.current!.startSession = async function newSession(): Promise<any> {
-                //@ts-ignore
-                console.log("Start session", session.session_id);
-                //@ts-ignore
-                return await fetch("/api/streaming.start", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        //@ts-ignore
-                        sessionId: session.session_id,
-                    }),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-            };
-
-            avatar.current!.stopAvatar = async function newSession(): Promise<any> {
-                this.closeVoiceChat();
-                //@ts-ignore
-                console.log("STOP", session.session_id);
-                //@ts-ignore
-                return await fetch("/api/streaming.stop", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        //@ts-ignore
-                        sessionId: session.session_id,
-                    }),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-            };
-
-            avatar.current!.speak = async function speak(requestData: SpeakRequest): Promise<any> {
-                requestData.taskType =
-                    requestData.taskType || requestData.task_type || TaskType.TALK;
-                requestData.taskMode = requestData.taskMode || TaskMode.ASYNC;
-
-                // try to use websocket first
-                // only support talk task
-                if (
-                    // @ts-ignore
-                    this.webSocket &&
-                    this.audioRawFrame &&
-                    requestData.task_type === TaskType.TALK &&
-                    requestData.taskMode !== TaskMode.SYNC
-                ) {
-                    // @ts-ignore
-                    const frame = this.audioRawFrame?.create({
-                        text: {
-                            text: requestData.text,
-                        },
-                    });
-                    // @ts-ignore
-                    const encodedFrame = new Uint8Array(this.audioRawFrame?.encode(frame).finish());
-                    // @ts-ignore
-                    this.webSocket?.send(encodedFrame);
-                    return;
-                }
-                // @ts-ignore
-                return fetch("/api/streaming.task", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        text: requestData.text,
-                        // @ts-ignore
-                        session_id: this.sessionId,
-                        task_mode: requestData.taskMode,
-                        task_type: requestData.taskType,
-                    }),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-            };
-
-            avatar.current!.startListening = async function startListening(): Promise<any> {
-                return await fetch("/api/streaming.start_listening", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        //@ts-ignore
-                        session_id: session.session_id,
-                    }),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-            };
-
-            avatar.current!.stopListening = async function stopListening(): Promise<any> {
-                return await fetch("/api/streaming.stop_listening", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        //@ts-ignore
-                        session_id: session.session_id,
-                    }),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-            };
-
-            avatar.current!.interrupt = async function interrupt(): Promise<any> {
-                return await fetch("/api/streaming.interrupt", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        //@ts-ignore
-                        session_id: session.session_id,
-                    }),
-                    headers: {
-                        //@ts-ignore
-                        Authorization: `Bearer ${this.token}`,
-                    },
-                });
-            };
-
-            // ========================== End Overrides =============================
+            registerOverrides();
+            registerAvatarEvents();
 
             const res = await avatar.current.createStartAvatar({
                 quality: AvatarQuality.High,
                 avatarName: avatarId,
-                knowledgeId: "8c0e0d1c9e3b43ebbcfaf2311852d8c4", // Or use a custom `knowledgeBase`.
+                knowledgeId: "8c0e0d1c9e3b43ebbcfaf2311852d8c4",
                 voice: {
-                    rate: 1.5, // 0.5 ~ 1.5
+                    rate: 1.5,
                     emotion: VoiceEmotion.EXCITED,
-                    // elevenlabsSettings: {
-                    //   stability: 1,
-                    //   similarity_boost: 1,
-                    //   style: 1,
-                    //   use_speaker_boost: false,
-                    // },
                 },
                 language: language,
-                // disableIdleTimeout: false,
             });
 
             setData(res);
@@ -279,6 +139,178 @@ export default function InteractiveAvatar() {
             setIsLoadingSession(false);
         }
     }
+
+    async function registerOverrides() {
+        let session: StartAvatarResponse;
+
+        avatar.current!.newSession = async function newSession(
+            requestData: StartAvatarRequest,
+        ): Promise<StartAvatarResponse> {
+            console.log("New session");
+            //@ts-ignore
+            const response = await fetch("/api/streaming.new", {
+                method: "POST",
+                body: JSON.stringify(requestData),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+
+            session = (await response.json()).data;
+            console.log(session);
+
+            return session;
+        };
+
+        avatar.current!.startSession = async function newSession(): Promise<any> {
+            //@ts-ignore
+            console.log("Start session", session.session_id);
+            //@ts-ignore
+            return await fetch("/api/streaming.start", {
+                method: "POST",
+                body: JSON.stringify({
+                    //@ts-ignore
+                    sessionId: session.session_id,
+                }),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+        };
+
+        avatar.current!.stopAvatar = async function newSession(): Promise<any> {
+            this.closeVoiceChat();
+            //@ts-ignore
+            console.log("STOP", session.session_id);
+            //@ts-ignore
+            return await fetch("/api/streaming.stop", {
+                method: "POST",
+                body: JSON.stringify({
+                    //@ts-ignore
+                    sessionId: session.session_id,
+                }),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+        };
+
+        avatar.current!.speak = async function speak(requestData: SpeakRequest): Promise<any> {
+            requestData.taskType = requestData.taskType || requestData.task_type || TaskType.TALK;
+            requestData.taskMode = requestData.taskMode || TaskMode.ASYNC;
+
+            // try to use websocket first
+            // only support talk task
+            if (
+                // @ts-ignore
+                this.webSocket &&
+                // @ts-ignore
+                this.audioRawFrame &&
+                requestData.task_type === TaskType.TALK &&
+                requestData.taskMode !== TaskMode.SYNC
+            ) {
+                // @ts-ignore
+                const frame = this.audioRawFrame?.create({
+                    text: {
+                        text: requestData.text,
+                    },
+                });
+                // @ts-ignore
+                const encodedFrame = new Uint8Array(this.audioRawFrame?.encode(frame).finish());
+                // @ts-ignore
+                this.webSocket?.send(encodedFrame);
+                return;
+            }
+            // @ts-ignore
+            return fetch("/api/streaming.task", {
+                method: "POST",
+                body: JSON.stringify({
+                    text: requestData.text,
+                    // @ts-ignore
+                    session_id: this.sessionId,
+                    task_mode: requestData.taskMode,
+                    task_type: requestData.taskType,
+                }),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+        };
+
+        avatar.current!.startListening = async function startListening(): Promise<any> {
+            return await fetch("/api/streaming.start_listening", {
+                method: "POST",
+                body: JSON.stringify({
+                    //@ts-ignore
+                    session_id: session.session_id,
+                }),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+        };
+
+        avatar.current!.stopListening = async function stopListening(): Promise<any> {
+            return await fetch("/api/streaming.stop_listening", {
+                method: "POST",
+                body: JSON.stringify({
+                    //@ts-ignore
+                    session_id: session.session_id,
+                }),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+        };
+
+        avatar.current!.interrupt = async function interrupt(): Promise<any> {
+            return await fetch("/api/streaming.interrupt", {
+                method: "POST",
+                body: JSON.stringify({
+                    //@ts-ignore
+                    session_id: session.session_id,
+                }),
+                headers: {
+                    //@ts-ignore
+                    Authorization: `Bearer ${this.token}`,
+                },
+            });
+        };
+    }
+
+    async function registerAvatarEvents() {
+        avatar.current?.on(StreamingEvents.AVATAR_START_TALKING, (e) => {
+            console.log("Avatar started talking", e);
+        });
+        avatar.current?.on(StreamingEvents.AVATAR_STOP_TALKING, (e) => {
+            console.log("Avatar stopped talking", e);
+        });
+        avatar.current?.on(StreamingEvents.STREAM_DISCONNECTED, () => {
+            console.log("Stream disconnected");
+            endSession();
+        });
+        avatar.current?.on(StreamingEvents.STREAM_READY, (event) => {
+            console.log(">>>>> Stream ready:", event.detail);
+            setStream(event.detail);
+            console.log("Recognition speech started");
+            recognitionRef.current?.start();
+        });
+        avatar.current?.on(StreamingEvents.USER_START, (event) => {
+            console.log(">>>>> User started talking:", event);
+            setIsUserTalking(true);
+        });
+        avatar.current?.on(StreamingEvents.USER_STOP, (event) => {
+            console.log(">>>>> User stopped talking:", event);
+            setIsUserTalking(false);
+        });
+    }
+
     async function handleSpeak() {
         setIsLoadingRepeat(true);
         if (!avatar.current) {
@@ -317,7 +349,7 @@ export default function InteractiveAvatar() {
             avatar.current?.closeVoiceChat();
         } else {
             await avatar.current?.startVoiceChat({
-                useSilencePrompt: false,
+                // useSilencePrompt: false,
             });
         }
         setChatMode(v);
@@ -382,6 +414,16 @@ export default function InteractiveAvatar() {
                                     onClick={endSession}
                                 >
                                     End session
+                                </Button>
+                                <Button
+                                    className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
+                                    size="md"
+                                    variant="shadow"
+                                    onClick={() => {
+                                        recognitionRef.current?.start();
+                                    }}
+                                >
+                                    Speak
                                 </Button>
                             </div>
                         </div>
