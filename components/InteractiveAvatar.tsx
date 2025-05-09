@@ -30,9 +30,12 @@ import { useMemoizedFn, usePrevious } from "ahooks";
 
 import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
-import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
-import { convertFloat32ToS16PCM, sleep } from "@/app/lib/utils";
-import { fetchAccessToken } from "@/app/lib/apiClient";
+import { fetchAccessToken } from "@/app/lib/apiClient/apiClient";
+import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
+import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
+import { Content } from "@google/genai";
+import { streamResponse } from "@/app/lib/apiClient/chat";
+import { CoreMessage } from "ai";
 
 export default function InteractiveAvatar() {
     const [isLoadingSession, setIsLoadingSession] = useState(false);
