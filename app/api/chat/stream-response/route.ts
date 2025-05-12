@@ -1,3 +1,4 @@
+import { provaTrainerPrompt } from "@/app/lib/ai/prompt";
 import { google } from "@/app/lib/geminiClient";
 import { CoreMessage, streamText } from "ai";
 import { NextRequest } from "next/server";
@@ -17,5 +18,5 @@ export async function POST(req: NextRequest) {
         model: google("gemini-2.0-flash-lite"),
     });
 
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
 }
