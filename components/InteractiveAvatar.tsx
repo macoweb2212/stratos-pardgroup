@@ -30,10 +30,9 @@ import { useEffect, useRef, useState } from "react";
 import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
 import { fetchAccessToken } from "@/app/lib/apiClient/apiClient";
+import { streamResponse } from "@/app/lib/apiClient/chat";
 import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
-import { Content } from "@google/genai";
-import { streamResponse } from "@/app/lib/apiClient/chat";
 import { CoreMessage } from "ai";
 
 export default function InteractiveAvatar() {
@@ -68,23 +67,32 @@ export default function InteractiveAvatar() {
             const transcript = event.results[0][0].transcript;
             console.log("User said:", transcript);
 
-            const updatedHistory: CoreMessage[] = [
+            let updatedHistory: CoreMessage[] = [
                 ...chatHistory,
                 {
                     role: "user",
                     content: transcript,
                 },
             ];
-            setChatHistory(updatedHistory);
+
             const reader = await streamResponse(updatedHistory);
             const decoder = new TextDecoder();
 
+            let fullText = "";
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const chunk = decoder.decode(value, { stream: true });
                 console.log(chunk); // logs incremental text
             }
+
+            console.log("fulltext", fullText);
+            updatedHistory.push({
+                role: "system",
+                content: fullText,
+            });
+
+            setChatHistory(updatedHistory);
             // console.log("Gemini's response", response.text);
             // console.log("Recognition response", response);
             // avatar.current?.speak({
