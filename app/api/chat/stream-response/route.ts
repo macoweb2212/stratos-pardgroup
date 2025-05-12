@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
     const result = await streamText({
         messages: chatHistory,
+        system: provaTrainerPrompt,
         //@ts-ignore
         model: google("gemini-2.0-flash-lite"),
     });
