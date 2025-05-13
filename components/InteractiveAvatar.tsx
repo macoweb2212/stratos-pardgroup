@@ -77,13 +77,62 @@ export default function InteractiveAvatar() {
             const decoder = new TextDecoder();
 
             let fullText = "";
+            let partialText = "";
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const chunk = decoder.decode(value, { stream: true });
-                console.log(chunk); // logs incremental text
                 fullText += chunk;
+                partialText += chunk;
+
+                const regexPunctuation = /[.]/;
+                const firstPunctuationIndex = partialText.search(regexPunctuation);
+                if (firstPunctuationIndex) {
+                    console.log("Found a punctuation");
+                    console.log("Partial text", partialText);
+                    const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
+                    const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
+
+                    console.log("First part:", firstPart);
+                    console.log("Second part:", secondPart);
+
+                    avatar.current
+                        ?.speak({
+                            text: firstPart,
+                            taskType: TaskType.REPEAT,
+                            taskMode: TaskMode.ASYNC,
+                        })
+                        .catch((error) => {
+                            console.error("Error while sending async repeat task:", error);
+                        });
+
+                    partialText = secondPart;
+                }
             }
+
+            // If there's any partial text left then speak
+            if (partialText.length >= 0) {
+                avatar.current
+                    ?.speak({
+                        text: partialText,
+                        taskType: TaskType.REPEAT,
+                        taskMode: TaskMode.ASYNC,
+                    })
+                    .then((result) => {
+                        console.log(result);
+                    })
+                    .catch((error) => {
+                        console.error("Error while sending async repeat task:", error);
+                    });
+            }
+            // avatar.current
+            //     ?.speak({
+            //         text: fullText,
+            //         taskType: TaskType.REPEAT,
+            //     })
+            //     .catch((error) => {
+            //         console.log("Error while sending async repeat task", error);
+            //     });
 
             console.log("fulltext", fullText);
             chatHistory.current = [
