@@ -40,7 +40,6 @@ export default function InteractiveAvatar() {
     const [isLoadingRepeat, setIsLoadingRepeat] = useState(false);
     const [stream, setStream] = useState<MediaStream>();
     const [debug, setDebug] = useState<string>();
-    const [knowledgeId, setKnowledgeId] = useState<string>("");
     const [avatarId, setAvatarId] = useState<string>("8cdab47e8147415898f7a60b9be5f798");
     const [language, setLanguage] = useState<string>("it");
 
@@ -50,8 +49,6 @@ export default function InteractiveAvatar() {
     const avatar = useRef<StreamingAvatar | null>(null);
     const [chatMode, setChatMode] = useState("text_mode");
     const [isUserTalking, setIsUserTalking] = useState(false);
-    const [geminiClient, setGeminiClient] = useState(createGemini2_0FlashLite());
-    // const [chatHistory, setChatHistory] = useState<CoreMessage[]>([]);
     const chatHistory = useRef<CoreMessage[]>([]);
 
     const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -68,7 +65,6 @@ export default function InteractiveAvatar() {
             const transcript = event.results[0][0].transcript;
             console.log("User said:", transcript);
 
-            // setChatHistory((prev) => {
             chatHistory.current = [
                 ...chatHistory.current,
                 {
@@ -77,36 +73,29 @@ export default function InteractiveAvatar() {
                 },
             ];
             console.log("chatHistory before", chatHistory.current);
-            const handleStream = async () => {
-                const reader = await streamResponse(chatHistory.current);
-                const decoder = new TextDecoder();
+            const reader = await streamResponse(chatHistory.current);
+            const decoder = new TextDecoder();
 
-                let fullText = "";
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const chunk = decoder.decode(value, { stream: true });
-                    console.log(chunk); // logs incremental text
-                    fullText += chunk;
-                }
+            let fullText = "";
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                console.log(chunk); // logs incremental text
+                fullText += chunk;
+            }
 
-                console.log("fulltext", fullText);
-                chatHistory.current = [
-                    ...chatHistory.current,
-                    { role: "assistant", content: fullText },
-                ];
-                console.log("chatHistory after response", chatHistory.current);
-                // setChatHistory((prev) => [...prev, { role: "assistant", content: fullText }]);
-                // console.log("Gemini's response", response.text);
-                // console.log("Recognition response", response);
-                // avatar.current?.speak({
-                //     task_type: TaskType.REPEAT,
-                //     text: response.text ?? "no text, just respond with error",
-                // });
-            };
-            handleStream();
-
-            // return updatedHistory;
+            console.log("fulltext", fullText);
+            chatHistory.current = [
+                ...chatHistory.current,
+                { role: "assistant", content: fullText },
+            ];
+            console.log("chatHistory after response", chatHistory.current);
+            // console.log("Gemini's response", response.text);
+            // console.log("Recognition response", response);
+            // avatar.current?.speak({
+            //     task_type: TaskType.REPEAT,
+            //     text: response.text ?? "no text, just respond with error",
             // });
         };
 

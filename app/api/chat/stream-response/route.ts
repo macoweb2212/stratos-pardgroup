@@ -6,7 +6,6 @@ import { NextRequest } from "next/server";
 export async function POST(req: NextRequest) {
     const body = await req.json();
     const chatHistory: CoreMessage[] = body.chatHistory;
-    console.log("chatHistory", chatHistory);
 
     if (!chatHistory) {
         return new Response(JSON.stringify({ error: "Missing chatHistory" }), { status: 400 });
