@@ -34,6 +34,7 @@ import { streamResponse } from "@/app/lib/apiClient/chat";
 import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
 import { CoreMessage } from "ai";
+import { PromiseQueue } from "@/app/lib/promiseQueue/promiseQueue";
 
 export default function InteractiveAvatar() {
     const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -78,6 +79,7 @@ export default function InteractiveAvatar() {
 
             let fullText = "";
             let partialText = "";
+            const promiseQueue = new PromiseQueue();
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -85,26 +87,30 @@ export default function InteractiveAvatar() {
                 fullText += chunk;
                 partialText += chunk;
 
-                const regexPunctuation = /[.]/;
+                const regexPunctuation = /\./;
                 const firstPunctuationIndex = partialText.search(regexPunctuation);
-                if (firstPunctuationIndex) {
+                if (firstPunctuationIndex != -1) {
                     console.log("Found a punctuation");
-                    console.log("Partial text", partialText);
+                    console.log("Partial text: ", partialText);
                     const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
                     const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
 
                     console.log("First part:", firstPart);
                     console.log("Second part:", secondPart);
 
-                    avatar.current
-                        ?.speak({
-                            text: firstPart,
-                            taskType: TaskType.REPEAT,
-                            taskMode: TaskMode.ASYNC,
-                        })
-                        .catch((error) => {
-                            console.error("Error while sending async repeat task:", error);
-                        });
+                    promiseQueue.add(async () => {
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                        console.log("Sending first part: ", firstPart);
+                        await avatar.current
+                            ?.speak({
+                                text: firstPart,
+                                taskType: TaskType.REPEAT,
+                                taskMode: TaskMode.ASYNC,
+                            })
+                            .catch((error) => {
+                                console.error("Error while sending async repeat task:", error);
+                            });
+                    });
 
                     partialText = secondPart;
                 }
@@ -112,18 +118,22 @@ export default function InteractiveAvatar() {
 
             // If there's any partial text left then speak
             if (partialText.length >= 0) {
-                avatar.current
-                    ?.speak({
-                        text: partialText,
-                        taskType: TaskType.REPEAT,
-                        taskMode: TaskMode.ASYNC,
-                    })
-                    .then((result) => {
-                        console.log(result);
-                    })
-                    .catch((error) => {
-                        console.error("Error while sending async repeat task:", error);
-                    });
+                promiseQueue.add(async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                    console.log("Sending final part: ", partialText);
+                    avatar.current
+                        ?.speak({
+                            text: partialText,
+                            taskType: TaskType.REPEAT,
+                            taskMode: TaskMode.ASYNC,
+                        })
+                        .then((result) => {
+                            console.log(result);
+                        })
+                        .catch((error) => {
+                            console.error("Error while sending async repeat task:", error);
+                        });
+                });
             }
             // avatar.current
             //     ?.speak({
