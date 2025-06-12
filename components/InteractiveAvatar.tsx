@@ -446,11 +446,11 @@ export default function InteractiveAvatar() {
     }, [mediaStream, stream]);
 
     return (
-        <div className="size-full flex flex-col items-center justify-center gap-4">
-            <Card className="w-[900px]">
+        <div className="size-full flex flex-col items-center justify-center gap-4 p-5">
+            <Card className="w-full md:max-w-[900px]">
                 <CardBody className="h-[500px] flex flex-col justify-center items-center">
                     {stream ? (
-                        <div className="h-[500px] w-[900px] justify-center items-center flex rounded-lg overflow-hidden">
+                        <div className="size-full justify-center items-center flex rounded-lg overflow-hidden">
                             <video
                                 ref={mediaStream}
                                 autoPlay
@@ -458,7 +458,7 @@ export default function InteractiveAvatar() {
                                 style={{
                                     width: "100%",
                                     height: "100%",
-                                    objectFit: "contain",
+                                    objectFit: "cover",
                                 }}
                             >
                                 <track kind="captions" />
@@ -493,7 +493,7 @@ export default function InteractiveAvatar() {
                             </div>
                         </div>
                     ) : !isLoadingSession ? (
-                        <div className="h-full justify-center items-center flex flex-col gap-8 w-[500px] self-center">
+                        <div className="h-full justify-center items-center flex flex-col gap-8 w-full self-center">
                             <div className="flex flex-col gap-2 w-full">
                                 {/* <p className="text-sm font-medium leading-none">
                   Custom Knowledge ID (optional)
@@ -542,7 +542,7 @@ export default function InteractiveAvatar() {
                     </SelectItem>
                   ))}
                 </Select> */}
-                                <div className="text-center font-semibold text-lg">
+                                <div className="text-center font-semibold text-base md:text-lg">
                                     Scopri il consulente virtuale Plenitude: informazioni complete
                                     sui nostri prodotti e servizi, con la possibilità effettuare
                                     roleplay di vendita e altre simulazioni interattive.
@@ -555,11 +555,11 @@ export default function InteractiveAvatar() {
                                     variant="shadow"
                                     onPress={startSession}
                                 >
-                                    Start session
+                                    Inizia sessione
                                 </Button>
                                 <Select
-                                    label="Select language"
-                                    placeholder="Select language"
+                                    label="Seleziona lingua"
+                                    placeholder="Seleziona lingua"
                                     className="h-10 w-32"
                                     selectedKeys={[language]}
                                     onChange={(e) => {
@@ -585,8 +585,8 @@ export default function InteractiveAvatar() {
                             handleChangeChatMode(v);
                         }}
                     >
-                        <Tab key="text_mode" title="Text mode" />
-                        <Tab key="voice_mode" title="Voice mode" />
+                        <Tab key="text_mode" title="Modalità testo" />
+                        <Tab key="voice_mode" title="Modalità voce" />
                     </Tabs>
                     {chatMode === "text_mode" ? (
                         <div className="w-full flex relative">
@@ -595,7 +595,7 @@ export default function InteractiveAvatar() {
                                 input={text}
                                 label="Chat"
                                 loading={isLoadingRepeat}
-                                placeholder="Type something for the avatar to respond"
+                                placeholder="Scrivi qualcosa all'avatar"
                                 setInput={setText}
                                 onSubmit={handleSpeak}
                             />
