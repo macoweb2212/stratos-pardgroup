@@ -470,7 +470,7 @@ export default function InteractiveAvatar() {
                                     variant="shadow"
                                     onClick={handleInterrupt}
                                 >
-                                    Interrupt task
+                                    Interrompi task
                                 </Button>
                                 <Button
                                     className="bg-gradient-to-tr from-indigo-500 to-indigo-300  text-white rounded-lg"
@@ -478,7 +478,7 @@ export default function InteractiveAvatar() {
                                     variant="shadow"
                                     onClick={endSession}
                                 >
-                                    End session
+                                    Termina sessione
                                 </Button>
                                 <Button
                                     className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
@@ -488,7 +488,7 @@ export default function InteractiveAvatar() {
                                         recognitionRef.current?.start();
                                     }}
                                 >
-                                    Speak
+                                    Parla
                                 </Button>
                             </div>
                         </div>
