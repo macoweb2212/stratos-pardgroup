@@ -15,6 +15,7 @@ class Gemini2_0FlashLite {
             model: "gemini-2.0-flash",
             config: {
                 systemInstruction: provaTrainerPrompt,
+                tools: [{ urlContext: {} }],
             },
         });
     }
