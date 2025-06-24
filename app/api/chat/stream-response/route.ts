@@ -1,4 +1,4 @@
-import { provaTrainerPrompt } from "@/app/lib/ai/prompt";
+import { promptUnificato } from "@/app/lib/ai/prompt";
 import { google } from "@/app/lib/geminiClient";
 import { CoreMessage, streamText } from "ai";
 import { NextRequest } from "next/server";
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     const result = await streamText({
         messages: chatHistory,
-        system: provaTrainerPrompt,
+        system: promptUnificato,
         //@ts-ignore
         model: google("gemini-2.0-flash-lite"),
     });
