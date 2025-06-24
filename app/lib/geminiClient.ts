@@ -12,7 +12,7 @@ class Gemini2_0FlashLite {
     generateContent(params: Omit<GenerateContentParameters, "model">) {
         return this.ai.models.generateContent({
             ...params,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             config: {
                 systemInstruction: promptUnificato,
                 tools: [{ urlContext: {} }],
