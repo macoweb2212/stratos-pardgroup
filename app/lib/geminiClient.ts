@@ -1,6 +1,6 @@
 import { GenerateContentParameters, GoogleGenAI } from "@google/genai";
 import { streamText } from "ai";
-
+import { promptUnificato } from "./ai/prompt";
 export const ai = new GoogleGenAI({ apiKey: "AIzaSyCNH-0agsIcfcYluvDvafVNLKitvtR1-cY" });
 
 class Gemini2_0FlashLite {
@@ -14,7 +14,7 @@ class Gemini2_0FlashLite {
             ...params,
             model: "gemini-2.0-flash",
             config: {
-                systemInstruction: provaTrainerPrompt,
+                systemInstruction: promptUnificato,
                 tools: [{ urlContext: {} }],
             },
         });
@@ -26,7 +26,6 @@ export function createGemini2_0FlashLite(customGoogleAiClient: GoogleGenAI = ai)
 }
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { provaTrainerPrompt } from "./ai/prompt";
 
 export const google = createGoogleGenerativeAI({
     apiKey: "AIzaSyCNH-0agsIcfcYluvDvafVNLKitvtR1-cY",
