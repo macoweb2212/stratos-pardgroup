@@ -35,6 +35,7 @@ import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
 import { CoreMessage } from "ai";
 import { PromiseQueue } from "@/app/lib/promiseQueue/promiseQueue";
+import { avatarRepeatAsync } from "@/app/lib/heygen/heygen";
 
 export default function InteractiveAvatar() {
     const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -101,15 +102,7 @@ export default function InteractiveAvatar() {
                     promiseQueue.add(async () => {
                         await new Promise((resolve) => setTimeout(resolve, 100));
                         console.log("Sending first part: ", firstPart);
-                        await avatar.current
-                            ?.speak({
-                                text: firstPart,
-                                taskType: TaskType.REPEAT,
-                                taskMode: TaskMode.ASYNC,
-                            })
-                            .catch((error) => {
-                                console.error("Error while sending async repeat task:", error);
-                            });
+                        avatar.current && (await avatarRepeatAsync(avatar.current, firstPart));
                     });
 
                     partialText = secondPart;
@@ -121,28 +114,9 @@ export default function InteractiveAvatar() {
                 promiseQueue.add(async () => {
                     await new Promise((resolve) => setTimeout(resolve, 100));
                     console.log("Sending final part: ", partialText);
-                    avatar.current
-                        ?.speak({
-                            text: partialText,
-                            taskType: TaskType.REPEAT,
-                            taskMode: TaskMode.ASYNC,
-                        })
-                        .then((result) => {
-                            console.log(result);
-                        })
-                        .catch((error) => {
-                            console.error("Error while sending async repeat task:", error);
-                        });
+                    avatar.current && (await avatarRepeatAsync(avatar.current, partialText));
                 });
             }
-            // avatar.current
-            //     ?.speak({
-            //         text: fullText,
-            //         taskType: TaskType.REPEAT,
-            //     })
-            //     .catch((error) => {
-            //         console.log("Error while sending async repeat task", error);
-            //     });
 
             console.log("fulltext", fullText);
             chatHistory.current = [
@@ -150,12 +124,6 @@ export default function InteractiveAvatar() {
                 { role: "assistant", content: fullText },
             ];
             console.log("chatHistory after response", chatHistory.current);
-            // console.log("Gemini's response", response.text);
-            // console.log("Recognition response", response);
-            // avatar.current?.speak({
-            //     task_type: TaskType.REPEAT,
-            //     text: response.text ?? "no text, just respond with error",
-            // });
         };
 
         recognitionRef.current.onerror = (error) => {
