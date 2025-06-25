@@ -132,7 +132,7 @@ const unitMap: Record<string, string> = {
     "%": "per cento",
 };
 
-export function replaceUnitsInSentence(sentence: string) {
+export function replaceNumberUnitsInSentence(sentence: string) {
     return sentence.replace(
         /(\d+(?:[.,]\d+)?)(\s?)(kWh|kWp|kW|Hz|mq|%)/gi,
         (_, num, space, unit) => {
@@ -153,6 +153,13 @@ export function replaceUnitsInSentence(sentence: string) {
     );
 }
 
+export function unitsToWords(text: string) {
+    return text.replace(
+        /\b(kWh|kWp|kW|Hz|mq|%)(?!\w)/gi,
+        (unit) => unitMap[unit.toLowerCase()] || unit,
+    );
+}
+
 /*
 normalizeEuroNumbersInText("Questa cosa costa 5.500 kWp");
 → "Questa cosa costa 5500 kWp"
@@ -170,9 +177,41 @@ function replaceNumbersWithWords(text: string): string {
     return text.replace(/\b\d+\b/g, (match) => numToWordsIt(Number(match)));
 }
 
+/*
+convertEuroAmountsToWords("Il prezzo è €8,50", numberToItalian);
+→ "Il prezzo è otto euro e cinquanta"
+
+convertEuroAmountsToWords("Totale 120€", numberToItalian);
+→ "Totale centoventi euro"
+*/
+function convertEuroAmountsToWords(text: string) {
+    return text.replace(
+        /€\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?€/g,
+        (_, euroPrefix, euroSuffix) => {
+            const raw = euroPrefix || euroSuffix;
+            const clean = raw.replace(/\./g, "").replace(",", ".");
+            const number = parseFloat(clean);
+            const intero = Math.floor(number);
+            const decimali = Math.round((number - intero) * 100);
+
+            let result = numToWordsIt(intero);
+            if (decimali > 0) {
+                result += ` euro e ${numToWordsIt(decimali)}`;
+            } else {
+                result += ` euro`;
+            }
+
+            return result;
+        },
+    );
+}
+
 export function preProcessTextToRepeat(text: string) {
-    let result = normalizeEuroNumbersInText(text);
-    result = replaceUnitsInSentence(result);
+    let result = text;
+    result = convertEuroAmountsToWords(result);
+    result = normalizeEuroNumbersInText(text);
+    result = replaceNumberUnitsInSentence(result);
+    result = unitsToWords(result);
 
     // Replace the remaining numbers with words
     return replaceNumbersWithWords(result);
