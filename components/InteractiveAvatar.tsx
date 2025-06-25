@@ -66,64 +66,7 @@ export default function InteractiveAvatar() {
         recognitionRef.current.onresult = async (event) => {
             const transcript = event.results[0][0].transcript;
             console.log("User said:", transcript);
-
-            chatHistory.current = [
-                ...chatHistory.current,
-                {
-                    role: "user",
-                    content: transcript,
-                },
-            ];
-            console.log("chatHistory before", chatHistory.current);
-            const reader = await streamResponse(chatHistory.current);
-            const decoder = new TextDecoder();
-
-            let fullText = "";
-            let partialText = "";
-            const promiseQueue = new PromiseQueue();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                fullText += chunk;
-                partialText += chunk;
-
-                const regexPunctuation = /\./;
-                const firstPunctuationIndex = partialText.search(regexPunctuation);
-                if (firstPunctuationIndex != -1) {
-                    console.log("Found a punctuation");
-                    console.log("Partial text: ", partialText);
-                    const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
-                    const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
-
-                    console.log("First part:", firstPart);
-                    console.log("Second part:", secondPart);
-
-                    promiseQueue.add(async () => {
-                        await new Promise((resolve) => setTimeout(resolve, 100));
-                        console.log("Sending first part: ", firstPart);
-                        avatar.current && (await avatarRepeatAsync(avatar.current, firstPart));
-                    });
-
-                    partialText = secondPart;
-                }
-            }
-
-            // If there's any partial text left then speak
-            if (partialText.length >= 0) {
-                promiseQueue.add(async () => {
-                    await new Promise((resolve) => setTimeout(resolve, 100));
-                    console.log("Sending final part: ", partialText);
-                    avatar.current && (await avatarRepeatAsync(avatar.current, partialText));
-                });
-            }
-
-            console.log("fulltext", fullText);
-            chatHistory.current = [
-                ...chatHistory.current,
-                { role: "assistant", content: fullText },
-            ];
-            console.log("chatHistory after response", chatHistory.current);
+            sendUserMessage(transcript);
         };
 
         recognitionRef.current.onerror = (error) => {
@@ -134,6 +77,64 @@ export default function InteractiveAvatar() {
             console.log("sound start");
         });
     }, []);
+
+    async function sendUserMessage(userMessage: string) {
+        chatHistory.current = [
+            ...chatHistory.current,
+            {
+                role: "user",
+                content: userMessage,
+            },
+        ];
+        console.log("chatHistory before", chatHistory.current);
+        const reader = await streamResponse(chatHistory.current);
+        const decoder = new TextDecoder();
+
+        let fullText = "";
+        let partialText = "";
+        const promiseQueue = new PromiseQueue();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            fullText += chunk;
+            partialText += chunk;
+
+            // Trova un punto ma solo se non circodato da numeri quindi: "0.0" non passa, "frase. Altra frase" passa
+            const regexPunctuation = /(?<!\d)\.(?!\d)/;
+            const firstPunctuationIndex = partialText.search(regexPunctuation);
+            if (firstPunctuationIndex != -1) {
+                console.log("Found a punctuation");
+                console.log("Partial text: ", partialText);
+                const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
+                const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
+
+                console.log("First part:", firstPart);
+                console.log("Second part:", secondPart);
+
+                promiseQueue.add(async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                    console.log("Sending first part: ", firstPart);
+                    avatar.current && (await avatarRepeatAsync(avatar.current, firstPart));
+                });
+
+                partialText = secondPart;
+            }
+        }
+
+        // If there's any partial text left then speak
+        if (partialText.length >= 0) {
+            promiseQueue.add(async () => {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                console.log("Sending final part: ", partialText);
+                avatar.current && (await avatarRepeatAsync(avatar.current, partialText));
+            });
+        }
+
+        console.log("fulltext", fullText);
+        chatHistory.current = [...chatHistory.current, { role: "assistant", content: fullText }];
+        console.log("chatHistory after response", chatHistory.current);
+    }
 
     async function startSession() {
         setIsLoadingSession(true);
@@ -351,13 +352,13 @@ export default function InteractiveAvatar() {
 
             return;
         }
-        // speak({ text: text, task_type: TaskType.REPEAT })
-        await avatar.current
-            .speak({ text: text, taskType: TaskType.TALK, taskMode: TaskMode.SYNC })
-            .catch((e) => {
-                setDebug(e.message);
-            });
-        setIsLoadingRepeat(false);
+
+        try {
+            await sendUserMessage(text);
+        } catch (error) {
+        } finally {
+            setIsLoadingRepeat(false);
+        }
     }
     async function handleInterrupt() {
         if (!avatar.current) {
