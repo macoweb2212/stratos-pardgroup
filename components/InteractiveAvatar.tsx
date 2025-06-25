@@ -36,6 +36,7 @@ import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
 import { CoreMessage } from "ai";
 import { PromiseQueue } from "@/app/lib/promiseQueue/promiseQueue";
 import { avatarRepeatAsync } from "@/app/lib/heygen/heygen";
+import { preProcessTextToRepeat } from "@/app/lib/ai/helpers/aiText";
 
 export default function InteractiveAvatar() {
     const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -104,18 +105,20 @@ export default function InteractiveAvatar() {
             const regexPunctuation = /(?<!\d)\.(?!\d)/;
             const firstPunctuationIndex = partialText.search(regexPunctuation);
             if (firstPunctuationIndex != -1) {
-                console.log("Found a punctuation");
-                console.log("Partial text: ", partialText);
+                // console.log("Found a punctuation");
+                // console.log("Partial text: ", partialText);
                 const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
                 const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
 
-                console.log("First part:", firstPart);
-                console.log("Second part:", secondPart);
+                // console.log("First part:", firstPart);
+                // console.log("Second part:", secondPart);
 
                 promiseQueue.add(async () => {
                     await new Promise((resolve) => setTimeout(resolve, 100));
-                    console.log("Sending first part: ", firstPart);
-                    avatar.current && (await avatarRepeatAsync(avatar.current, firstPart));
+                    // console.log("Sending first part: ", firstPart);
+                    const processedFirstPart = preProcessTextToRepeat(firstPart);
+                    console.log("Processed first part", processedFirstPart);
+                    avatar.current && (await avatarRepeatAsync(avatar.current, processedFirstPart));
                 });
 
                 partialText = secondPart;
@@ -126,14 +129,16 @@ export default function InteractiveAvatar() {
         if (partialText.length >= 0) {
             promiseQueue.add(async () => {
                 await new Promise((resolve) => setTimeout(resolve, 100));
-                console.log("Sending final part: ", partialText);
-                avatar.current && (await avatarRepeatAsync(avatar.current, partialText));
+                const preprocessedPartialText = preProcessTextToRepeat(partialText);
+                console.log("Sending final part: ", preprocessedPartialText);
+                avatar.current &&
+                    (await avatarRepeatAsync(avatar.current, preprocessedPartialText));
             });
         }
 
         console.log("fulltext", fullText);
         chatHistory.current = [...chatHistory.current, { role: "assistant", content: fullText }];
-        console.log("chatHistory after response", chatHistory.current);
+        // console.log("chatHistory after response", chatHistory.current);
     }
 
     async function startSession() {
@@ -320,27 +325,27 @@ export default function InteractiveAvatar() {
 
     async function registerAvatarEvents() {
         avatar.current?.on(StreamingEvents.AVATAR_START_TALKING, (e) => {
-            console.log("Avatar started talking", e);
+            // console.log("Avatar started talking", e);
         });
         avatar.current?.on(StreamingEvents.AVATAR_STOP_TALKING, (e) => {
-            console.log("Avatar stopped talking", e);
+            // console.log("Avatar stopped talking", e);
         });
         avatar.current?.on(StreamingEvents.STREAM_DISCONNECTED, () => {
-            console.log("Stream disconnected");
+            // console.log("Stream disconnected");
             endSession();
         });
         avatar.current?.on(StreamingEvents.STREAM_READY, (event) => {
-            console.log(">>>>> Stream ready:", event.detail);
+            // console.log(">>>>> Stream ready:", event.detail);
             setStream(event.detail);
-            console.log("Recognition speech started");
+            // console.log("Recognition speech started");
             recognitionRef.current?.start();
         });
         avatar.current?.on(StreamingEvents.USER_START, (event) => {
-            console.log(">>>>> User started talking:", event);
+            // console.log(">>>>> User started talking:", event);
             setIsUserTalking(true);
         });
         avatar.current?.on(StreamingEvents.USER_STOP, (event) => {
-            console.log(">>>>> User stopped talking:", event);
+            // console.log(">>>>> User stopped talking:", event);
             setIsUserTalking(false);
         });
     }
