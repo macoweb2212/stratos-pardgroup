@@ -132,7 +132,7 @@ const unitMap: Record<string, string> = {
     "%": "per cento",
 };
 
-export function replaceNumberUnitsInSentence(sentence: string) {
+export function numberUnitsToWords(sentence: string) {
     return sentence.replace(
         /(\d+(?:[.,]\d+)?)(\s?)(kWh|kWp|kW|Hz|mq|%)/gi,
         (_, num, space, unit) => {
@@ -210,7 +210,7 @@ export function preProcessTextToRepeat(text: string) {
     let result = text;
     result = convertEuroAmountsToWords(result);
     result = normalizeEuroNumbersInText(text);
-    result = replaceNumberUnitsInSentence(result);
+    result = numberUnitsToWords(result);
     result = unitsToWords(result);
 
     // Replace the remaining numbers with words
