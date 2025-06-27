@@ -209,7 +209,7 @@ function convertEuroAmountsToWords(text: string) {
 export function preProcessTextToRepeat(text: string) {
     let result = text;
     result = convertEuroAmountsToWords(result);
-    result = normalizeEuroNumbersInText(text);
+    result = normalizeEuroNumbersInText(result);
     result = numberUnitsToWords(result);
     result = unitsToWords(result);
 
