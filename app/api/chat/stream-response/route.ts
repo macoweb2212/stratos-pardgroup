@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
         messages: chatHistory,
         system: promptUnificato,
         //@ts-ignore
-        model: google("gemini-2.5-flash-preview-04-17"),
+        model: google("gemini-2.5-flash"),
     });
 
     return result.toTextStreamResponse();
