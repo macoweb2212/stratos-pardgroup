@@ -32,7 +32,6 @@ import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 import { fetchAccessToken } from "@/app/lib/apiClient/apiClient";
 import { streamResponse } from "@/app/lib/apiClient/chat";
 import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
-import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
 import { CoreMessage } from "ai";
 import { PromiseQueue } from "@/app/lib/promiseQueue/promiseQueue";
 import { avatarRepeatAsync } from "@/app/lib/heygen/heygen";
