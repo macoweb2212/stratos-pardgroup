@@ -443,7 +443,7 @@ export default function InteractiveAvatar() {
                                     variant="shadow"
                                     onClick={handleInterrupt}
                                 >
-                                    Interrompi task
+                                    Pausa
                                 </Button>
                                 <Button
                                     className="bg-gradient-to-tr from-indigo-500 to-indigo-300  text-white rounded-lg"
