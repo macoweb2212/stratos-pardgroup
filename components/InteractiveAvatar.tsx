@@ -49,7 +49,7 @@ export default function InteractiveAvatar() {
     const [text, setText] = useState<string>("");
     const mediaStream = useRef<HTMLVideoElement>(null);
     const avatar = useRef<StreamingAvatar | null>(null);
-    const [chatMode, setChatMode] = useState("text_mode");
+    const [chatMode, setChatMode] = useState("voice_mode");
     const [isUserTalking, setIsUserTalking] = useState(false);
     const chatHistory = useRef<CoreMessage[]>([]);
 
