@@ -32,7 +32,6 @@ import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 import { fetchAccessToken } from "@/app/lib/apiClient/apiClient";
 import { streamResponse } from "@/app/lib/apiClient/chat";
 import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
-import { createGemini2_0FlashLite } from "@/app/lib/geminiClient";
 import { CoreMessage } from "ai";
 import { PromiseQueue } from "@/app/lib/promiseQueue/promiseQueue";
 
@@ -48,7 +47,7 @@ export default function InteractiveAvatar() {
     const [text, setText] = useState<string>("");
     const mediaStream = useRef<HTMLVideoElement>(null);
     const avatar = useRef<StreamingAvatar | null>(null);
-    const [chatMode, setChatMode] = useState("text_mode");
+    //const [chatMode, setChatMode] = useState("text_mode");
     const [isUserTalking, setIsUserTalking] = useState(false);
     const chatHistory = useRef<CoreMessage[]>([]);
 
@@ -61,6 +60,10 @@ export default function InteractiveAvatar() {
         recognitionRef.current = new SpeechRecognition();
         recognitionRef.current.lang = "it-IT";
         recognitionRef.current.interimResults = false;
+
+        recognitionRef.current.onend = async (event) => {
+            setIsUserTalking(false);
+        }
 
         recognitionRef.current.onresult = async (event) => {
             const transcript = event.results[0][0].transcript;
@@ -86,6 +89,9 @@ export default function InteractiveAvatar() {
                 const chunk = decoder.decode(value, { stream: true });
                 fullText += chunk;
                 partialText += chunk;
+
+                partialText = fixText(partialText);
+                fullText = fixText(fullText);
 
                 const regexPunctuation = /\./;
                 const firstPunctuationIndex = partialText.search(regexPunctuation);
@@ -165,6 +171,11 @@ export default function InteractiveAvatar() {
         recognitionRef.current.addEventListener("soundstart", (event) => {
             console.log("sound start");
         });
+
+        recognitionRef.current.onstart = (error) => {
+            setIsUserTalking(true);
+        };
+
     }, []);
 
     async function startSession() {
@@ -184,7 +195,7 @@ export default function InteractiveAvatar() {
                 avatarName: avatarId,
                 knowledgeId: "8c0e0d1c9e3b43ebbcfaf2311852d8c4",
                 voice: {
-                    rate: 1.5,
+                    rate: 1,
                     emotion: VoiceEmotion.EXCITED,
                 },
                 language: language,
@@ -406,7 +417,44 @@ export default function InteractiveAvatar() {
         setStream(undefined);
     }
 
-    const handleChangeChatMode = useMemoizedFn(async (v) => {
+    function fixText(text: string): string {
+        return text.replaceAll(/(\d)(?=€)/g, '$1 ').replaceAll("€", "euro").replaceAll("kilowatt (kW)", "kilowatt").replaceAll("kW", "kilowatt").replaceAll(/(\d)(?=kilowatt)/g, '$1 ').replaceAll(/\d+/g, (match) => {
+            return numberInLetters(parseInt(match));
+        }).replaceAll("mille", "mille ");
+    }
+
+    function numberInLetters(n: number): string {
+        const unita = ['zero', 'uno', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove'];
+        const decine = ['', '', 'venti', 'trenta', 'quaranta', 'cinquanta', 'sessanta', 'settanta', 'ottanta', 'novanta'];
+        const speciali = ['dieci', 'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove'];
+
+        if (n < 10) return unita[n];
+        if (n < 20) return speciali[n - 10];
+
+        if (n < 100) {
+            let d = Math.floor(n / 10), u = n % 10;
+            let parola = decine[d];
+            if (u === 1 || u === 8) parola = parola.slice(0, -1); // Elisione
+            return parola + (u > 0 ? unita[u] : '');
+        }
+
+        if (n < 1000) {
+            let c = Math.floor(n / 100), resto = n % 100;
+            let parola = (c === 1 ? 'cento' : unita[c] + 'cento');
+            if (resto >= 80 && resto < 90) parola = parola.slice(0, -1); // Elisione con "ottanta"
+            return parola + (resto > 0 ? numberInLetters(resto) : '');
+        }
+
+        if (n < 10000) {
+            let m = Math.floor(n / 1000), resto = n % 1000;
+            let mille: any = (m === 1 ? 'mille' : numberInLetters(m) + 'mila');
+            return mille + (resto > 0 ? numberInLetters(resto) : '');
+        }
+
+        return n.toString(); // fuori range
+    }
+
+    /*const handleChangeChatMode = useMemoizedFn(async (v) => {
         if (v === chatMode) {
             return;
         }
@@ -418,7 +466,7 @@ export default function InteractiveAvatar() {
             });
         }
         setChatMode(v);
-    });
+    });*/
 
     const previousText = usePrevious(text);
     useEffect(() => {
@@ -470,7 +518,7 @@ export default function InteractiveAvatar() {
                                     variant="shadow"
                                     onClick={handleInterrupt}
                                 >
-                                    Interrompi task
+                                    Pausa
                                 </Button>
                                 <Button
                                     className="bg-gradient-to-tr from-indigo-500 to-indigo-300  text-white rounded-lg"
@@ -481,14 +529,17 @@ export default function InteractiveAvatar() {
                                     Termina sessione
                                 </Button>
                                 <Button
-                                    className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
+                                    className={`text-white rounded-lg ${isUserTalking
+                                        ? "bg-green-500 hover:bg-green-600"
+                                        : "bg-gradient-to-tr from-indigo-500 to-indigo-300"
+                                        }`}
                                     size="md"
                                     variant="shadow"
                                     onClick={() => {
-                                        recognitionRef.current?.start();
+                                        isUserTalking ? recognitionRef.current?.stop() : recognitionRef.current?.start();
                                     }}
                                 >
-                                    Parla
+                                    {isUserTalking ? 'In ascolto' : 'Parla'}
                                 </Button>
                             </div>
                         </div>
@@ -578,7 +629,7 @@ export default function InteractiveAvatar() {
                 </CardBody>
                 <Divider />
                 <CardFooter className="flex flex-col gap-3 relative">
-                    <Tabs
+                    {/*<Tabs
                         aria-label="Options"
                         selectedKey={chatMode}
                         onSelectionChange={(v) => {
@@ -588,20 +639,20 @@ export default function InteractiveAvatar() {
                         <Tab key="text_mode" title="Modalità testo" />
                         <Tab key="voice_mode" title="Modalità voce" />
                     </Tabs>
-                    {chatMode === "text_mode" ? (
-                        <div className="w-full flex relative">
-                            <InteractiveAvatarTextInput
-                                disabled={!stream}
-                                input={text}
-                                label="Chat"
-                                loading={isLoadingRepeat}
-                                placeholder="Scrivi qualcosa all'avatar"
-                                setInput={setText}
-                                onSubmit={handleSpeak}
-                            />
-                            {text && <Chip className="absolute right-16 top-3">Listening</Chip>}
-                        </div>
-                    ) : (
+                    {//chatMode === "text_mode" ? (*/}
+                    <div className="w-full flex relative">
+                        <InteractiveAvatarTextInput
+                            disabled={!stream}
+                            input={text}
+                            label="Chat"
+                            loading={isLoadingRepeat}
+                            placeholder="Scrivi qualcosa all'avatar"
+                            setInput={setText}
+                            onSubmit={handleSpeak}
+                        />
+                        {text && <Chip className="absolute right-16 top-3">Listening</Chip>}
+                    </div>
+                    {/*) : (
                         <div className="w-full text-center">
                             <Button
                                 isDisabled={!isUserTalking}
@@ -612,7 +663,7 @@ export default function InteractiveAvatar() {
                                 {isUserTalking ? "Listening" : "Voice chat"}
                             </Button>
                         </div>
-                    )}
+                    )*/}
                 </CardFooter>
             </Card>
             {/* <p className="font-mono text-right">
