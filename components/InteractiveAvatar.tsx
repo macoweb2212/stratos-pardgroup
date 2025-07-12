@@ -34,8 +34,6 @@ import { streamResponse } from "@/app/lib/apiClient/chat";
 import { STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { CoreMessage } from "ai";
 import { PromiseQueue } from "@/app/lib/promiseQueue/promiseQueue";
-import { avatarRepeatAsync } from "@/app/lib/heygen/heygen";
-import { preProcessTextToRepeat } from "@/app/lib/ai/helpers/aiText";
 
 export default function InteractiveAvatar() {
     const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -49,7 +47,7 @@ export default function InteractiveAvatar() {
     const [text, setText] = useState<string>("");
     const mediaStream = useRef<HTMLVideoElement>(null);
     const avatar = useRef<StreamingAvatar | null>(null);
-    const [chatMode, setChatMode] = useState("voice_mode");
+    //const [chatMode, setChatMode] = useState("text_mode");
     const [isUserTalking, setIsUserTalking] = useState(false);
     const chatHistory = useRef<CoreMessage[]>([]);
 
@@ -63,10 +61,107 @@ export default function InteractiveAvatar() {
         recognitionRef.current.lang = "it-IT";
         recognitionRef.current.interimResults = false;
 
+        recognitionRef.current.onend = async (event) => {
+            setIsUserTalking(false);
+        }
+
         recognitionRef.current.onresult = async (event) => {
             const transcript = event.results[0][0].transcript;
             console.log("User said:", transcript);
-            sendUserMessage(transcript);
+
+            chatHistory.current = [
+                ...chatHistory.current,
+                {
+                    role: "user",
+                    content: transcript,
+                },
+            ];
+            console.log("chatHistory before", chatHistory.current);
+            const reader = await streamResponse(chatHistory.current);
+            const decoder = new TextDecoder();
+
+            let fullText = "";
+            let partialText = "";
+            const promiseQueue = new PromiseQueue();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                fullText += chunk;
+                partialText += chunk;
+
+                partialText = fixText(partialText);
+                fullText = fixText(fullText);
+
+                const regexPunctuation = /\./;
+                const firstPunctuationIndex = partialText.search(regexPunctuation);
+                if (firstPunctuationIndex != -1) {
+                    console.log("Found a punctuation");
+                    console.log("Partial text: ", partialText);
+                    const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
+                    const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
+
+                    console.log("First part:", firstPart);
+                    console.log("Second part:", secondPart);
+
+                    promiseQueue.add(async () => {
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                        console.log("Sending first part: ", firstPart);
+                        await avatar.current
+                            ?.speak({
+                                text: firstPart,
+                                taskType: TaskType.REPEAT,
+                                taskMode: TaskMode.ASYNC,
+                            })
+                            .catch((error) => {
+                                console.error("Error while sending async repeat task:", error);
+                            });
+                    });
+
+                    partialText = secondPart;
+                }
+            }
+
+            // If there's any partial text left then speak
+            if (partialText.length >= 0) {
+                promiseQueue.add(async () => {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                    console.log("Sending final part: ", partialText);
+                    avatar.current
+                        ?.speak({
+                            text: partialText,
+                            taskType: TaskType.REPEAT,
+                            taskMode: TaskMode.ASYNC,
+                        })
+                        .then((result) => {
+                            console.log(result);
+                        })
+                        .catch((error) => {
+                            console.error("Error while sending async repeat task:", error);
+                        });
+                });
+            }
+            // avatar.current
+            //     ?.speak({
+            //         text: fullText,
+            //         taskType: TaskType.REPEAT,
+            //     })
+            //     .catch((error) => {
+            //         console.log("Error while sending async repeat task", error);
+            //     });
+
+            console.log("fulltext", fullText);
+            chatHistory.current = [
+                ...chatHistory.current,
+                { role: "assistant", content: fullText },
+            ];
+            console.log("chatHistory after response", chatHistory.current);
+            // console.log("Gemini's response", response.text);
+            // console.log("Recognition response", response);
+            // avatar.current?.speak({
+            //     task_type: TaskType.REPEAT,
+            //     text: response.text ?? "no text, just respond with error",
+            // });
         };
 
         recognitionRef.current.onerror = (error) => {
@@ -76,69 +171,12 @@ export default function InteractiveAvatar() {
         recognitionRef.current.addEventListener("soundstart", (event) => {
             console.log("sound start");
         });
+
+        recognitionRef.current.onstart = (error) => {
+            setIsUserTalking(true);
+        };
+
     }, []);
-
-    async function sendUserMessage(userMessage: string) {
-        chatHistory.current = [
-            ...chatHistory.current,
-            {
-                role: "user",
-                content: userMessage,
-            },
-        ];
-        console.log("chatHistory before", chatHistory.current);
-        const reader = await streamResponse(chatHistory.current);
-        const decoder = new TextDecoder();
-
-        let fullText = "";
-        let partialText = "";
-        const promiseQueue = new PromiseQueue();
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            fullText += chunk;
-            partialText += chunk;
-
-            // Trova un punto ma solo se non circodato da numeri quindi: "0.0" non passa, "frase. Altra frase" passa
-            const regexPunctuation = /(?<!\d)\.(?!\d)/;
-            const firstPunctuationIndex = partialText.search(regexPunctuation);
-            if (firstPunctuationIndex != -1) {
-                // console.log("Found a punctuation");
-                // console.log("Partial text: ", partialText);
-                const firstPart = partialText.slice(0, firstPunctuationIndex + 1);
-                const secondPart = partialText.slice(firstPunctuationIndex + 1).trim();
-
-                // console.log("First part:", firstPart);
-                // console.log("Second part:", secondPart);
-
-                promiseQueue.add(async () => {
-                    await new Promise((resolve) => setTimeout(resolve, 100));
-                    // console.log("Sending first part: ", firstPart);
-                    const processedFirstPart = preProcessTextToRepeat(firstPart);
-                    console.log("Processed first part", processedFirstPart);
-                    avatar.current && (await avatarRepeatAsync(avatar.current, processedFirstPart));
-                });
-
-                partialText = secondPart;
-            }
-        }
-
-        // If there's any partial text left then speak
-        if (partialText.length >= 0) {
-            promiseQueue.add(async () => {
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                const preprocessedPartialText = preProcessTextToRepeat(partialText);
-                console.log("Sending final part: ", preprocessedPartialText);
-                avatar.current &&
-                    (await avatarRepeatAsync(avatar.current, preprocessedPartialText));
-            });
-        }
-
-        console.log("fulltext", fullText);
-        chatHistory.current = [...chatHistory.current, { role: "assistant", content: fullText }];
-        // console.log("chatHistory after response", chatHistory.current);
-    }
 
     async function startSession() {
         setIsLoadingSession(true);
@@ -157,7 +195,7 @@ export default function InteractiveAvatar() {
                 avatarName: avatarId,
                 knowledgeId: "8c0e0d1c9e3b43ebbcfaf2311852d8c4",
                 voice: {
-                    rate: 1.5,
+                    rate: 1,
                     emotion: VoiceEmotion.EXCITED,
                 },
                 language: language,
@@ -324,27 +362,27 @@ export default function InteractiveAvatar() {
 
     async function registerAvatarEvents() {
         avatar.current?.on(StreamingEvents.AVATAR_START_TALKING, (e) => {
-            // console.log("Avatar started talking", e);
+            console.log("Avatar started talking", e);
         });
         avatar.current?.on(StreamingEvents.AVATAR_STOP_TALKING, (e) => {
-            // console.log("Avatar stopped talking", e);
+            console.log("Avatar stopped talking", e);
         });
         avatar.current?.on(StreamingEvents.STREAM_DISCONNECTED, () => {
-            // console.log("Stream disconnected");
+            console.log("Stream disconnected");
             endSession();
         });
         avatar.current?.on(StreamingEvents.STREAM_READY, (event) => {
-            // console.log(">>>>> Stream ready:", event.detail);
+            console.log(">>>>> Stream ready:", event.detail);
             setStream(event.detail);
-            // console.log("Recognition speech started");
+            console.log("Recognition speech started");
             recognitionRef.current?.start();
         });
         avatar.current?.on(StreamingEvents.USER_START, (event) => {
-            // console.log(">>>>> User started talking:", event);
+            console.log(">>>>> User started talking:", event);
             setIsUserTalking(true);
         });
         avatar.current?.on(StreamingEvents.USER_STOP, (event) => {
-            // console.log(">>>>> User stopped talking:", event);
+            console.log(">>>>> User stopped talking:", event);
             setIsUserTalking(false);
         });
     }
@@ -356,13 +394,13 @@ export default function InteractiveAvatar() {
 
             return;
         }
-
-        try {
-            await sendUserMessage(text);
-        } catch (error) {
-        } finally {
-            setIsLoadingRepeat(false);
-        }
+        // speak({ text: text, task_type: TaskType.REPEAT })
+        await avatar.current
+            .speak({ text: text, taskType: TaskType.TALK, taskMode: TaskMode.SYNC })
+            .catch((e) => {
+                setDebug(e.message);
+            });
+        setIsLoadingRepeat(false);
     }
     async function handleInterrupt() {
         if (!avatar.current) {
@@ -379,7 +417,44 @@ export default function InteractiveAvatar() {
         setStream(undefined);
     }
 
-    const handleChangeChatMode = useMemoizedFn(async (v) => {
+    function fixText(text: string): string {
+        return text.replaceAll(/(\d)(?=€)/g, '$1 ').replaceAll("€", "euro").replaceAll("kilowatt (kW)", "kilowatt").replaceAll("kW", "kilowatt").replaceAll(/(\d)(?=kilowatt)/g, '$1 ').replaceAll(/\d+/g, (match) => {
+            return numberInLetters(parseInt(match));
+        }).replaceAll("mille", "mille ");
+    }
+
+    function numberInLetters(n: number): string {
+        const unita = ['zero', 'uno', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove'];
+        const decine = ['', '', 'venti', 'trenta', 'quaranta', 'cinquanta', 'sessanta', 'settanta', 'ottanta', 'novanta'];
+        const speciali = ['dieci', 'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove'];
+
+        if (n < 10) return unita[n];
+        if (n < 20) return speciali[n - 10];
+
+        if (n < 100) {
+            let d = Math.floor(n / 10), u = n % 10;
+            let parola = decine[d];
+            if (u === 1 || u === 8) parola = parola.slice(0, -1); // Elisione
+            return parola + (u > 0 ? unita[u] : '');
+        }
+
+        if (n < 1000) {
+            let c = Math.floor(n / 100), resto = n % 100;
+            let parola = (c === 1 ? 'cento' : unita[c] + 'cento');
+            if (resto >= 80 && resto < 90) parola = parola.slice(0, -1); // Elisione con "ottanta"
+            return parola + (resto > 0 ? numberInLetters(resto) : '');
+        }
+
+        if (n < 10000) {
+            let m = Math.floor(n / 1000), resto = n % 1000;
+            let mille: any = (m === 1 ? 'mille' : numberInLetters(m) + 'mila');
+            return mille + (resto > 0 ? numberInLetters(resto) : '');
+        }
+
+        return n.toString(); // fuori range
+    }
+
+    /*const handleChangeChatMode = useMemoizedFn(async (v) => {
         if (v === chatMode) {
             return;
         }
@@ -391,7 +466,7 @@ export default function InteractiveAvatar() {
             });
         }
         setChatMode(v);
-    });
+    });*/
 
     const previousText = usePrevious(text);
     useEffect(() => {
@@ -454,14 +529,17 @@ export default function InteractiveAvatar() {
                                     Termina sessione
                                 </Button>
                                 <Button
-                                    className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
+                                    className={`text-white rounded-lg ${isUserTalking
+                                        ? "bg-green-500 hover:bg-green-600"
+                                        : "bg-gradient-to-tr from-indigo-500 to-indigo-300"
+                                        }`}
                                     size="md"
                                     variant="shadow"
                                     onClick={() => {
-                                        recognitionRef.current?.start();
+                                        isUserTalking ? recognitionRef.current?.stop() : recognitionRef.current?.start();
                                     }}
                                 >
-                                    Parla
+                                    {isUserTalking ? 'In ascolto' : 'Parla'}
                                 </Button>
                             </div>
                         </div>
@@ -551,7 +629,7 @@ export default function InteractiveAvatar() {
                 </CardBody>
                 <Divider />
                 <CardFooter className="flex flex-col gap-3 relative">
-                    <Tabs
+                    {/*<Tabs
                         aria-label="Options"
                         selectedKey={chatMode}
                         onSelectionChange={(v) => {
@@ -561,20 +639,20 @@ export default function InteractiveAvatar() {
                         <Tab key="text_mode" title="Modalità testo" />
                         <Tab key="voice_mode" title="Modalità voce" />
                     </Tabs>
-                    {chatMode === "text_mode" ? (
-                        <div className="w-full flex relative">
-                            <InteractiveAvatarTextInput
-                                disabled={!stream}
-                                input={text}
-                                label="Chat"
-                                loading={isLoadingRepeat}
-                                placeholder="Scrivi qualcosa all'avatar"
-                                setInput={setText}
-                                onSubmit={handleSpeak}
-                            />
-                            {text && <Chip className="absolute right-16 top-3">Listening</Chip>}
-                        </div>
-                    ) : (
+                    {//chatMode === "text_mode" ? (*/}
+                    <div className="w-full flex relative">
+                        <InteractiveAvatarTextInput
+                            disabled={!stream}
+                            input={text}
+                            label="Chat"
+                            loading={isLoadingRepeat}
+                            placeholder="Scrivi qualcosa all'avatar"
+                            setInput={setText}
+                            onSubmit={handleSpeak}
+                        />
+                        {text && <Chip className="absolute right-16 top-3">Listening</Chip>}
+                    </div>
+                    {/*) : (
                         <div className="w-full text-center">
                             <Button
                                 isDisabled={!isUserTalking}
@@ -585,7 +663,7 @@ export default function InteractiveAvatar() {
                                 {isUserTalking ? "Listening" : "Voice chat"}
                             </Button>
                         </div>
-                    )}
+                    )*/}
                 </CardFooter>
             </Card>
             {/* <p className="font-mono text-right">
