@@ -853,6 +853,12 @@ Sole Protetto (PLUS/PRIME):
 ### DESCRIZIONE RAPIDA
 Servizio per adottare virtualmente pannello da impianto Plenitude in Sardegna. Energia consumata simultaneamente = sconto 100% bolletta.
 
+### REQUISITI TECNICI OBBLIGATORI
+Contatore 2G obbligatorio con rilevazione quartoraria attiva
+Incompatibilità con offerte PLACET e offerte flat/rata costante
+Stesso punto di prelievo del contratto di fornitura
+Cliente domestico con fornitura luce Plenitude attiva o da attivare
+
 ### TAGLIE E PREZZI
 - Pannello S (0,3kW): €2/mese, ~420 kWh/anno, ideale 1-2 persone
 - Pannello M (0,6kW): €3/mese, ~840 kWh/anno, ideale 3-4 persone  
@@ -868,6 +874,15 @@ Servizio per adottare virtualmente pannello da impianto Plenitude in Sardegna. E
 - Pannello S (0,3kW): €2/mese | Risparmio potenziale: €27/anno
 - Pannello M (0,6kW): €3/mese | Risparmio potenziale: €66/anno  
 - Pannello L (0,9kW): €5/mese | Risparmio potenziale: €94/anno
+
+
+### FUNZIONALITÀ MONITORAGGIO
+App Plenitude e Area Riservata: monitoraggio completo
+Dettaglio produzione: fino a quindici minuti
+Riepilogo benefici: disponibile dopo dieci giorni fine mese precedente
+Risparmio in euro: visibile solo quando cliente viene fatturato
+Gestione autonoma: disattivazione servizio tramite area riservata
+Visualizzazione bolletta: sconto in riga dedicata "Sconto pannello"
 
 ---
 
